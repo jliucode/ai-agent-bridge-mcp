@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
     async def sse(request: Request):
         return await sse_endpoint(request)
 
-    # ── JSON-RPC messages endpoint for agents ──
+    # ── JSON-RPC messages endpoint for MCP clients ──
     @app.post("/messages")
     async def messages(request: Request):
         try:
@@ -50,6 +50,9 @@ def create_app() -> FastAPI:
                 status_code=400,
             )
         result = await handle_message(session_id, body)
+        if result is None:
+            # MCP notification — no response body
+            return JSONResponse(None, status_code=202)
         return JSONResponse(result)
 
     # ── WebSocket for frontend ──

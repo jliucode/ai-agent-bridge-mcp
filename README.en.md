@@ -117,6 +117,55 @@ curl -X POST "http://localhost:8000/messages?session_id=<agent-b-session>" \
 
 Agent A receives `task.updated` and `task.result` events via SSE in real time.
 
+### Claude Code Integration
+
+Claude Code connects to this bridge via the standard MCP SSE protocol. Once connected, it appears on the Dashboard and can exchange tasks with other agents.
+
+**1. Configure Claude Code**
+
+Create a `.mcp.json` in your project root (or use the `/mcp` command in Claude Code):
+
+```json
+{
+  "mcpServers": {
+    "agent-bridge": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse"
+    }
+  }
+}
+```
+
+**2. Auto-register after connecting**
+
+Once connected, ask Claude Code:
+
+> Use the agent_register tool to register this agent. Set name to "claude-code-01", project to "my-project", and list your MCP servers and skills under capabilities.
+
+Claude Code calls `agent_register` to register. After registration:
+- This Claude Code instance appears on the Dashboard with status, project, and capability badges
+- Use `agent_list` to see all online agents
+- Use `task_delegate` to send tasks to other agents
+- Receive real-time task updates from other agents via SSE
+
+**3. List all agents**
+
+> Use agent_list to show all currently connected agents
+
+**4. Delegate a task to another agent**
+
+> Use task_delegate to send "Fix null pointer in login endpoint" to agent-b (ID: xxx). Description: The login endpoint returns 500 when given null input.
+
+**5. Receive results from other agents**
+
+When the target agent completes the task, Claude Code receives a `task.result` event via SSE and can report it in the conversation.
+
+**6. Send heartbeats**
+
+> Use agent_heartbeat to send a heartbeat
+
+Consider adding heartbeat calls to a cron hook for automatic keep-alive every 30 seconds.
+
 ### Web Dashboard
 
 Open `http://localhost:3000` to see:

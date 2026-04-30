@@ -117,6 +117,55 @@ curl -X POST "http://localhost:8000/messages?session_id=<agent-b-session>" \
 
 Agent A 会通过 SSE 实时收到 `task.updated` 和 `task.result` 事件。
 
+### Claude Code 接入
+
+Claude Code 可以通过标准 MCP SSE 协议接入本桥接服务，接入后自动出现在 Dashboard 上，并可与其他 Agent 互派任务。
+
+**1. 配置 Claude Code**
+
+在项目根目录创建 `.mcp.json`（或通过 `/mcp` 命令在 Claude Code 中配置）：
+
+```json
+{
+  "mcpServers": {
+    "agent-bridge": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse"
+    }
+  }
+}
+```
+
+**2. 启动后自动注册**
+
+Claude Code 连接到桥接服务后，在对话中输入：
+
+> 请使用 agent_register 工具注册当前 agent，name 填 "claude-code-01"，project 填 "my-project"，capabilities 中列出你的 MCP 和 skill
+
+Claude Code 会调用 `agent_register` 工具完成注册。注册成功后：
+- Dashboard 上出现该 Claude Code 实例的卡片，显示在线状态、项目名、能力标签
+- 可以通过 `agent_list` 查看所有在线的 Agent
+- 可以通过 `task_delegate` 将任务委派给其他 Agent
+- 收到其他 Agent 委派的任务时，会通过 SSE 实时推送
+
+**3. 查看所有 Agent**
+
+> 请使用 agent_list 查看当前在线的所有 agent
+
+**4. 委派任务给其他 Agent**
+
+> 请使用 task_delegate 将「修复登录接口的空指针异常」委派给 agent-b（ID: xxx），描述：用户传空参数时 login 接口返回 500
+
+**5. 接收其他 Agent 的结果**
+
+当目标 Agent 完成任务后，Claude Code 会通过 SSE 收到 `task.result` 事件，可以在对话中查看。
+
+**6. 手动发送心跳**
+
+> 请使用 agent_heartbeat 发送心跳
+
+也可以将心跳添加到 Claude Code 的定时任务或 hook 中，每 30 秒自动发送。
+
 ### 网页 Dashboard
 
 打开 `http://localhost:3000`，可以看到：
