@@ -13,11 +13,8 @@ WORKDIR /app
 # 拷贝项目文件
 COPY . .
 
-# 使用 uv 安装依赖，使用清华源镜像库
-RUN uv pip install --system --index-url https://pypi.tuna.tsinghua.edu.cn/simple pandas openpyxl requests openai pymupdf pdfplumber pypdf pyxlsb fastapi uvicorn
-
-# 安装项目
-RUN uv pip install --system --no-cache -i https://pypi.tuna.tsinghua.edu.cn/simple -e .
+# 安装项目及全部依赖
+RUN uv pip install --system --index-url https://pypi.tuna.tsinghua.edu.cn/simple -e ".[full]"
 
 # 暴露端口
 EXPOSE 8000
