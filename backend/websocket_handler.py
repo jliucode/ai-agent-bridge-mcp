@@ -111,3 +111,42 @@ async def handle_proxy_message(websocket: WebSocket, machine_ip: str, msg: dict)
                 "status": msg["status"],
                 "result": msg.get("result"),
             })
+
+    elif msg_type == "skill_call":
+        task_id = msg["task_id"]
+        to_agent = msg["to_agent"]
+        to_machine = msg["to_machine"]
+
+        # Store task for result tracking
+        proxy_manager.skill_tasks[task_id] = {
+            "from_agent": msg["from_agent"],
+            "from_machine": msg["from_machine"],
+            "task_id": task_id,
+        }
+
+        # Forward to target machine
+        await proxy_manager.send_to_machine(to_machine, {
+            "type": "skill_call",
+            "task_id": task_id,
+            "skill": msg["skill"],
+            "action": msg["action"],
+            "params": msg["params"],
+            "files": msg.get("files", []),
+            "from_agent": msg["from_agent"],
+            "to_agent": to_agent,
+            "is_local": msg.get("is_local", False),
+        })
+
+    elif msg_type == "skill_result":
+        task_id = msg["task_id"]
+        task = proxy_manager.skill_tasks.get(task_id)
+
+        if task:
+            # Send result back to source machine
+            await proxy_manager.send_to_machine(task["from_machine"], {
+                "type": "skill_result",
+                "task_id": task_id,
+                "result": msg["result"],
+                "status": msg["status"],
+            })
+            proxy_manager.skill_tasks.pop(task_id, None)
