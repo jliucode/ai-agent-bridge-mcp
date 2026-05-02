@@ -46,10 +46,17 @@ class BridgeClient:
             logger.log_error(f"Connection failed: {e}")
             self.connected = False
 
-    async def send(self, msg: dict):
-        """Send message to Bridge."""
-        if self.ws:
+    async def send(self, msg: dict) -> bool:
+        """Send message to Bridge. Returns success status."""
+        if not self.ws:
+            logger.log_error("Cannot send: WebSocket not connected")
+            return False
+        try:
             await self.ws.send(json.dumps(msg))
+            return True
+        except Exception as e:
+            logger.log_error(f"Send failed: {e}")
+            return False
 
     async def receive_loop(self):
         """Receive messages from Bridge."""
@@ -79,16 +86,25 @@ class BridgeClient:
         while self.connected:
             await asyncio.sleep(30)
             if self.connected:
-                await self.send({
-                    "type": "machine_heartbeat",
-                    "machine_ip": self.machine_ip,
-                    "timestamp": time.time(),
-                })
+                try:
+                    await self.send({
+                        "type": "machine_heartbeat",
+                        "machine_ip": self.machine_ip,
+                        "timestamp": time.time(),
+                    })
+                except Exception as e:
+                    logger.log_error(f"Heartbeat failed: {e}")
+                    self.connected = False
+                    break
 
     async def close(self):
         """Close connection."""
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
         if self.ws:
             await self.ws.close()
         self.connected = False
