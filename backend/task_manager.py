@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .models import Task, TaskStatus
+from .llm_router import llm_router
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +107,23 @@ class TaskManager:
             logger.warning("All agents offline for project: %s", to_project)
             return {"type": "delegate_failed", "error": f"All agents offline in project {to_project}"}
 
-        # Prefer idle agents
-        idle = [a for a in candidates if a.get("status") == "IDLE"]
-        target_agent = idle[0] if idle else candidates[0]
+        # Try LLM routing for intelligent agent selection
+        decision = await llm_router.route(
+            task_type="delegate",
+            description=f"{title}: {description}",
+            required_skills=[],
+            target_project=to_project,
+            candidates=candidates,
+        )
+
+        if decision:
+            target_agent = decision["agent"]
+            logger.info("LLM routing selected: %s (reason: %s)", target_agent.get("agent_id"), decision.get("reason"))
+        else:
+            # Fallback to simple routing
+            decision = llm_router.fallback_route(candidates)
+            target_agent = decision["agent"]
+            logger.info("Fallback routing selected: %s (reason: %s)", target_agent.get("agent_id"), decision.get("reason"))
 
         # Create task
         task_id = f"task-{int(time.time())}-{uuid.uuid4().hex[:4]}"
