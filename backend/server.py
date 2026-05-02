@@ -3,12 +3,13 @@
 import json
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .mcp_handler import frontend_ws, handle_message, sse_endpoint
 from .routes import router
+from .websocket_handler import proxy_manager, handle_proxy_message
 
 logger = logging.getLogger(__name__)
 
@@ -59,5 +60,33 @@ def create_app() -> FastAPI:
     @app.websocket("/ws")
     async def ws(websocket):
         await frontend_ws(websocket)
+
+    # ── WebSocket for MCP Proxy connections ──
+    @app.websocket("/ws_proxy")
+    async def ws_proxy_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for MCP Proxy connections."""
+        machine_ip = None
+        try:
+            await websocket.accept()
+
+            # Wait for hello message
+            msg = await websocket.receive_json()
+            if msg.get("type") != "hello":
+                await websocket.close()
+                return
+
+            machine_ip = msg["machine_ip"]
+            await proxy_manager.connect(websocket, machine_ip)
+
+            while True:
+                msg = await websocket.receive_json()
+                await handle_proxy_message(websocket, machine_ip, msg)
+
+        except WebSocketDisconnect:
+            if machine_ip:
+                await proxy_manager.disconnect(machine_ip)
+        except Exception as e:
+            if machine_ip:
+                await proxy_manager.disconnect(machine_ip)
 
     return app
