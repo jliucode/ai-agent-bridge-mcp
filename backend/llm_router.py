@@ -4,6 +4,8 @@ import asyncio
 from typing import Optional
 import httpx
 
+from config import DASHSCOPE_API_KEY, DASHSCOPE_MODEL_NAME
+
 
 BRIDGE_ROUTE_PROMPT = """你是一个任务路由决策助手。根据以下信息选择最合适的目标 Agent。
 
@@ -32,10 +34,10 @@ class LLMRouter:
     """LLM-based routing decision."""
 
     def __init__(self):
-        self.enabled = True  # Check config
+        self.enabled = bool(DASHSCOPE_API_KEY)  # Enabled when API key is set
         self.provider = "qwen"
-        self.api_key = ""  # From config
-        self.model = "qwen-max"
+        self.api_key = DASHSCOPE_API_KEY
+        self.model = DASHSCOPE_MODEL_NAME
         self.timeout = 5.0
 
     async def route(
