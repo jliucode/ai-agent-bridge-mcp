@@ -13,6 +13,13 @@ pip install -e .
 # 启动服务
 python main.py
 # 服务运行在 http://localhost:8000
+
+
+```
+### 双远程提交
+```
+git push origin
+git push github --all
 ```
 
 ### 前端
