@@ -1,34 +1,60 @@
 # AI Agent Bridge MCP
 
-AI Agent 之间的桥梁，基于 MCP 协议实现 agent 间的实时通讯、任务委派与状态监控。
+A bridge for AI agents — real-time communication, task delegation, and status monitoring via the MCP protocol.
 
-## 快速启动
+## Quick Start
 
-### 后端
+### Backend Server
 
 ```bash
-# 安装依赖
+# Install dependencies
 pip install -e .
 
-# 启动服务
+# Start the server
 python main.py
-# 服务运行在 http://localhost:8000
-
-
-```
-### 双远程提交
-```
-git push origin
-git push github --all
+# Server running at http://localhost:8000
 ```
 
-### 前端
+### Client (MCP Proxy)
+
+The client component connects AI agents (like Claude Code) to the Bridge Server:
+
+```bash
+cd client
+
+# Install dependencies
+pip install -e .
+
+# Create .env file (optional)
+cat > .env << EOF
+BRIDGE_URL=ws://localhost:8000/ws_proxy
+LOG_LEVEL=INFO
+EOF
+
+# Start the MCP Proxy
+python main.py
+```
+
+Configure Claude Code to use the proxy:
+
+```json
+{
+  "mcpServers": {
+    "agent-bridge-proxy": {
+      "command": "python",
+      "args": ["F:/path/to/client/main.py"]
+    }
+  }
+}
+```
+
+### Frontend Dashboard
 
 ```bash
 cd frontend
 npm install
 npm run dev
-# 开发服务运行在 http://localhost:3000 (API 代理到 :8000)
+# Dev server at http://localhost:3000 (API proxied to :8000)
 ```
 
 ### Docker
@@ -38,13 +64,73 @@ docker build -t ai-agent-bridge .
 docker run -p 8000:8000 ai-agent-bridge
 ```
 
-## 使用说明
+## Architecture
 
-### Agent 注册与连接
+> 📖 For detailed technical architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Agent 通过 **SSE + JSON-RPC 2.0** 协议连接到服务器，流程如下：
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Frontend Dashboard                        │
+│                    (Vue 3 + WebSocket + Pinia)                   │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               │ WebSocket
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         Bridge Server                            │
+│                   (FastAPI + SSE + JSON-RPC)                     │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │ Agent Registry│  │Task Manager │  │ WebSocket Proxy API  │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+               ┌───────────────┼───────────────┐
+               │               │               │
+               │ SSE           │ WS Proxy      │ SSE
+               ▼               ▼               ▼
+┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+│  Claude Code A    │  │   MCP Proxy      │  │  Claude Code B    │
+│  (Direct SSE)     │  │ (Client Agent)   │  │  (Direct SSE)     │
+└───────────────────┘  └───────────────────┘  └───────────────────┘
+```
 
-**1. 连接 SSE 获取会话 ID**
+## Client Component (MCP Proxy)
+
+The client (`client/`) provides an MCP Proxy that allows Claude Code instances to:
+- Register themselves with the Bridge
+- List remote agents across different machines
+- Delegate tasks to other agents
+- Receive and handle assigned tasks
+- Update task status and results
+
+### Client Tools
+
+| Tool | Description |
+|------|-------------|
+| `agent_register` | Register/update agent info (project, skills, capabilities) |
+| `get_pending_tasks` | Get pending tasks for current agent |
+| `list_remote_agents` | List agents on other machines |
+| `task_delegate` | Delegate task to another project's agent |
+| `task_update` | Update task status (IN_PROGRESS, DONE, FAILED) |
+
+### Client Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BRIDGE_URL` | `ws://localhost:8000/ws_proxy` | WebSocket proxy endpoint |
+| `LOG_LEVEL` | `INFO` | Logging level |
+| `LLM_ENABLED` | `false` | Enable LLM routing |
+| `LLM_PROVIDER` | `qwen` | LLM provider (qwen, moonshot) |
+| `DASHSCOPE_API_KEY` | — | DashScope API key for LLM |
+
+## Usage
+
+### Agent Registration & Connection
+
+Agents connect via **SSE + JSON-RPC 2.0** protocol:
+
+**1. Connect to SSE to get a session ID**
 
 ```bash
 curl -N http://localhost:8000/sse
@@ -52,7 +138,7 @@ curl -N http://localhost:8000/sse
 # → data: {"session_id": "abc123..."}
 ```
 
-**2. 注册 Agent**
+**2. Register the agent**
 
 ```bash
 curl -X POST "http://localhost:8000/messages?session_id=abc123..." \
@@ -67,15 +153,15 @@ curl -X POST "http://localhost:8000/messages?session_id=abc123..." \
       "capabilities": {
         "mcp_servers": ["gitnexus", "zread"],
         "skills": ["pptx", "commit"],
-        "description": "代码生成与 Bug 修复"
+        "description": "Code generation and bug fixing"
       }
     }
   }'
 ```
 
-注册成功后，前端 Dashboard 会实时显示该 Agent 的在线状态、项目名称、IP、能力标签等信息。
+Once registered, the Dashboard will show this agent's status, project, IP, and capability badges in real time.
 
-**3. 发送心跳保持在线**
+**3. Send heartbeats to stay online**
 
 ```bash
 curl -X POST "http://localhost:8000/messages?session_id=abc123..." \
@@ -83,13 +169,13 @@ curl -X POST "http://localhost:8000/messages?session_id=abc123..." \
   -d '{"jsonrpc": "2.0", "id": "2", "method": "agent.heartbeat"}'
 ```
 
-超过 60 秒无心跳，Agent 会自动标记为 OFFLINE。
+Agents are auto-marked OFFLINE after 60 seconds without a heartbeat.
 
-### 任务委派
+### Task Delegation
 
-Agent A 可以将任务委派给 Agent B，并实时接收执行结果：
+Agent A can delegate a task to Agent B and receive real-time results:
 
-**1. 委派任务**
+**1. Delegate a task**
 
 ```bash
 curl -X POST "http://localhost:8000/messages?session_id=<agent-a-session>" \
@@ -99,38 +185,38 @@ curl -X POST "http://localhost:8000/messages?session_id=<agent-a-session>" \
     "id": "3",
     "method": "task.delegate",
     "params": {
-      "title": "修复登录接口 Bug",
-      "description": "登录接口在空参数时返回 500 错误",
+      "title": "Fix login bug",
+      "description": "Login endpoint returns 500 on null input",
       "to_agent": "<agent-b-id>"
     }
   }'
 ```
 
-**2. 更新任务状态**
+**2. Update task progress and result**
 
-Agent B 通过 SSE 收到 `task.assigned` 事件，处理后更新状态：
+Agent B receives a `task.assigned` event via SSE, then updates the task:
 
 ```bash
-# 开始处理
+# Start working
 curl -X POST "http://localhost:8000/messages?session_id=<agent-b-session>" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc": "2.0", "id": "4", "method": "task.update", "params": {"task_id": "<task-id>", "status": "IN_PROGRESS"}}'
 
-# 完成任务并返回结果
+# Complete with result
 curl -X POST "http://localhost:8000/messages?session_id=<agent-b-session>" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "id": "5", "method": "task.update", "params": {"task_id": "<task-id>", "status": "DONE", "result": "已修复：添加了空值检查"}}'
+  -d '{"jsonrpc": "2.0", "id": "5", "method": "task.update", "params": {"task_id": "<task-id>", "status": "DONE", "result": "Fixed: added null check"}}'
 ```
 
-Agent A 会通过 SSE 实时收到 `task.updated` 和 `task.result` 事件。
+Agent A receives `task.updated` and `task.result` events via SSE in real time.
 
-### Claude Code 接入
+### Claude Code Integration
 
-Claude Code 可以通过标准 MCP SSE 协议接入本桥接服务，接入后自动出现在 Dashboard 上，并可与其他 Agent 互派任务。
+Claude Code connects to this bridge via the standard MCP SSE protocol. Once connected, it appears on the Dashboard and can exchange tasks with other agents.
 
-**1. 配置 Claude Code**
+**1. Configure Claude Code**
 
-在项目根目录创建 `.mcp.json`（或通过 `/mcp` 命令在 Claude Code 中配置）：
+Create a `.mcp.json` in your project root (or use the `/mcp` command in Claude Code):
 
 ```json
 {
@@ -143,135 +229,155 @@ Claude Code 可以通过标准 MCP SSE 协议接入本桥接服务，接入后�
 }
 ```
 
-**2. 启动后自动注册**
+**2. Auto-register after connecting**
 
-Claude Code 连接到桥接服务后，在对话中输入：
+Once connected, ask Claude Code:
 
-> 请使用 agent_register 工具注册当前 agent，name 填 "claude-code-01"，project 填 "my-project"，capabilities 中列出你的 MCP 和 skill
+> Use the agent_register tool to register this agent. Set name to "claude-code-01", project to "my-project", and list your MCP servers and skills under capabilities.
 
-Claude Code 会调用 `agent_register` 工具完成注册。注册成功后：
-- Dashboard 上出现该 Claude Code 实例的卡片，显示在线状态、项目名、能力标签
-- 可以通过 `agent_list` 查看所有在线的 Agent
-- 可以通过 `task_delegate` 将任务委派给其他 Agent
-- 收到其他 Agent 委派的任务时，会通过 SSE 实时推送
+Claude Code calls `agent_register` to register. After registration:
+- This Claude Code instance appears on the Dashboard with status, project, and capability badges
+- Use `agent_list` to see all online agents
+- Use `task_delegate` to send tasks to other agents
+- Receive real-time task updates from other agents via SSE
 
-**3. 查看所有 Agent**
+**3. List all agents**
 
-> 请使用 agent_list 查看当前在线的所有 agent
+> Use agent_list to show all currently connected agents
 
-**4. 委派任务给其他 Agent**
+**4. Delegate a task to another agent**
 
-> 请使用 task_delegate 将「修复登录接口的空指针异常」委派给 agent-b（ID: xxx），描述：用户传空参数时 login 接口返回 500
+> Use task_delegate to send "Fix null pointer in login endpoint" to agent-b (ID: xxx). Description: The login endpoint returns 500 when given null input.
 
-**5. 接收其他 Agent 的结果**
+**5. Receive results from other agents**
 
-当目标 Agent 完成任务后，Claude Code 会通过 SSE 收到 `task.result` 事件，可以在对话中查看。
+When the target agent completes the task, Claude Code receives a `task.result` event via SSE and can report it in the conversation.
 
-**6. 手动发送心跳**
+**6. Send heartbeats**
 
-> 请使用 agent_heartbeat 发送心跳
+> Use agent_heartbeat to send a heartbeat
 
-也可以将心跳添加到 Claude Code 的定时任务或 hook 中，每 30 秒自动发送。
+Consider adding heartbeat calls to a cron hook for automatic keep-alive every 30 seconds.
 
-### 网页 Dashboard
+### Web Dashboard
 
-打开 `http://localhost:3000`，可以看到：
-- **StatsBar**：Agent 总数、在线数、忙闲数、任务统计
-- **AgentDashboard**：所有 Agent 卡片，展示状态、项目、IP、当前任务、MCP/Skill 能力标签
-- **TaskPanel**：任务列表，实时显示委派关系和执行状态
+Open `http://localhost:3000` to see:
+- **StatsBar**: Total agents, online/busy counts, task statistics
+- **AgentDashboard**: Agent cards showing status, project, IP, current task, and MCP/Skill tags
+- **TaskPanel**: Live task list with delegation flow and execution status
 
-## 核心功能
+## Features
 
-- **MCP JSON-RPC 2.0 over SSE** — Agent 实时双向通讯
-- **任务委派与追踪** — 跨 Agent 任务分发、状态同步、结果回传
-- **炫酷 Dashboard** — Vue 3 实时展示 Agent 状态、能力矩阵、任务流转
-- **Agent 注册中心** — 心跳检测、自动离线标记、状态管理
-- **REST API** — 查询 Agent、任务、统计数据
-- **WebSocket 推送** — 前端实时更新
+- **MCP JSON-RPC 2.0 over SSE** — Real-time bidirectional agent communication
+- **Task delegation & tracking** — Cross-agent task dispatch, status sync, result delivery
+- **Live Dashboard** — Vue 3 real-time display of agent status, capability matrix, task flow
+- **Agent registry** — Heartbeat monitoring, auto-offline detection, state management
+- **REST API** — Query agents, tasks, and statistics
+- **WebSocket push** — Real-time frontend updates
+- **MCP Proxy Client** — Enable Claude Code on any machine to join the bridge
 
-## 架构
-
-```
-Frontend (Vue 3 + Pinia)  ←→  WebSocket / REST API  ←→  FastAPI Backend
-                                ↑
-Agent A ←→ SSE + JSON-RPC ←→ /sse + /messages ←→ Agent B
-```
-
-## 项目结构
+## Project Structure
 
 ```
 ai-agent-bridge-mcp/
-  main.py               # 入口 — 启动 uvicorn
-  config.py             # 日志 & LLM 配置
-  pyproject.toml        # 项目元数据与依赖
-  Dockerfile            # Docker 构建
+  main.py               # Entry point — uvicorn runner
+  config.py             # Logging & LLM configuration
+  pyproject.toml        # Project metadata & dependencies
+  Dockerfile            # Docker build
   backend/
-    server.py           # FastAPI 应用, SSE/WS 端点
+    server.py           # FastAPI app, SSE/WS endpoints
     mcp_handler.py      # MCP JSON-RPC 2.0 over SSE
-    agent_registry.py   # Agent 注册、心跳、状态
-    task_manager.py     # 任务生命周期管理
-    models.py           # Pydantic 数据模型
-    routes.py           # REST API 路由
+    agent_registry.py   # Agent CRUD, heartbeat, state
+    task_manager.py     # Task lifecycle, delegation
+    models.py           # Pydantic data models
+    routes.py           # REST API routes
+  client/
+    main.py             # Client entry point
+    config.py           # Client configuration
+    bridge_client.py    # WebSocket client to Bridge
+    mcp_server.py       # MCP Proxy Server
+    agent_manager.py    # Local agent management
+    remote_agents_cache.py  # Remote agent cache
+    llm_router.py       # LLM routing (optional)
+    tools/
+      agent_tools.py    # Agent registration tools
+      task_tools.py     # Task delegation tools
+      remote_skill.py   # Remote skill invocation
+    utils/
+      logger.py         # Logging utilities
+      file_transfer.py  # File transfer utilities
   frontend/
     src/
-      App.vue           # 根布局
-      api/index.js      # REST + WebSocket 客户端
+      App.vue           # Root layout
+      api/index.js      # REST + WebSocket client
       components/
-        AgentDashboard.vue  # Agent 卡片网格
-        AgentCard.vue       # 单个 Agent 状态卡片
-        TaskPanel.vue       # 任务列表面板
-        CapabilityBadge.vue # MCP/Skill 标签
-        StatusIndicator.vue # 在线状态指示灯
-        StatsBar.vue        # 统计摘要栏
-      stores/           # Pinia 状态管理
+        AgentDashboard.vue  # Agent card grid
+        AgentCard.vue       # Single agent status card
+        TaskPanel.vue       # Task list panel
+        CapabilityBadge.vue # MCP/Skill tag badge
+        StatusIndicator.vue # Online status dot
+        StatsBar.vue        # Summary statistics bar
+      stores/           # Pinia state management
 ```
 
-## API 端点
+## API Endpoints
 
-| Method | Path | 说明 |
-|--------|------|------|
-| GET | `/health` | 健康检查 |
-| GET | `/api/agents` | 列出所有 Agent |
-| GET | `/api/agents/{id}` | 获取 Agent 详情 |
-| GET | `/api/tasks` | 列出任务 (可选 `?from_agent=` `?to_agent=`) |
-| GET | `/api/tasks/{id}` | 获取任务详情 |
-| GET | `/api/stats` | Dashboard 统计数据 |
-| GET | `/sse` | SSE 端点 (Agent 连接) |
-| POST | `/messages?session_id=` | Agent JSON-RPC 消息 |
-| WS | `/ws` | 前端 WebSocket 实时推送 |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| GET | `/api/agents` | List all agents |
+| GET | `/api/agents/{id}` | Get agent details |
+| GET | `/api/tasks` | List tasks (optional `?from_agent=` `?to_agent=`) |
+| GET | `/api/tasks/{id}` | Get task details |
+| GET | `/api/stats` | Dashboard statistics |
+| GET | `/sse` | SSE endpoint (agent connects here) |
+| POST | `/messages?session_id=` | JSON-RPC messages from agents |
+| WS | `/ws` | WebSocket for frontend real-time updates |
+| WS | `/ws_proxy` | WebSocket proxy for client agents |
 
-## MCP 协议方法
+## MCP Methods
 
-### Agent 方法
+### Agent Methods
 
-| Method | 说明 |
-|--------|------|
-| `agent.register` | 注册 Agent (名称、项目、能力) |
-| `agent.heartbeat` | 心跳保活 |
-| `agent.update_status` | 更新状态 (ONLINE/BUSY/IDLE) |
-| `agent.list` | 列出所有已注册 Agent |
+| Method | Description |
+|--------|-------------|
+| `agent.register` | Register with name, project, capabilities |
+| `agent.heartbeat` | Periodic keep-alive |
+| `agent.update_status` | Change status (ONLINE/BUSY/IDLE) |
+| `agent.list` | List all registered agents |
 
-### 任务方法
+### Task Methods
 
-| Method | 说明 |
-|--------|------|
-| `task.delegate` | 委派任务给其他 Agent |
-| `task.update` | 更新任务状态与结果 |
-| `task.list` | 查询当前 Agent 的任务列表 |
+| Method | Description |
+|--------|-------------|
+| `task.delegate` | Send a task to another agent |
+| `task.update` | Update task status and result |
+| `task.list` | List tasks for this agent |
 
-### 标准 MCP
+### Standard MCP
 
-| Method | 说明 |
-|--------|------|
-| `tools/list` | 列出可用 MCP 工具 |
+| Method | Description |
+|--------|-------------|
+| `tools/list` | List available MCP tools |
 
-## 环境变量
+## Environment Variables
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `SERVER_HOST` | `0.0.0.0` | 绑定地址 |
-| `SERVER_PORT` | `8000` | 服务端口 |
-| `MOONSHOT_API_KEY` | — | Moonshot LLM API Key |
-| `DASHSCOPE_API_KEY` | — | 百炼 (Qwen) API Key |
-| `DASHSCOPE_MODEL_NAME` | `qwen-max` | 百炼模型名 |
-| `DEFAULT_OUTPUT_DIR` | `output` | 默认输出目录 |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERVER_HOST` | `0.0.0.0` | Bind address |
+| `SERVER_PORT` | `8000` | Server port |
+| `MOONSHOT_API_KEY` | — | Moonshot LLM API key |
+| `DASHSCOPE_API_KEY` | — | DashScope (Qwen) API key |
+| `DASHSCOPE_MODEL_NAME` | `qwen-max` | DashScope model name |
+| `DEFAULT_OUTPUT_DIR` | `output` | Default output directory |
+
+## Dual Remote Push
+
+```bash
+git push origin
+git push github --all
+```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
