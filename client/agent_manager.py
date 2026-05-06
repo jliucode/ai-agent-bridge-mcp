@@ -28,7 +28,7 @@ class AgentManager:
         self.bridge = bridge_client
         self.mcp_server = None
         self.agents: dict[str, AgentInfo] = {}
-        self.sessions: dict[str, str] = {}  # session_id → agent_id
+        self.sessions: dict[str, str] = {}  # session_id -> agent_id
         self.remote_agents: list[dict] = []
 
     def set_mcp_server(self, mcp_server):
@@ -139,14 +139,14 @@ class AgentManager:
 
             if self.mcp_server:
                 await self.mcp_server.notify_channel(
-                    content=f"""新任务到达!
-任务: {task['title']}
-描述: {task['description']}
-来自: {task['from_agent']}
+                    content=f"""New task arrived!
+Task: {task['title']}
+Description: {task['description']}
+From: {task['from_agent']}
 
-建议操作:
-1. 调用 get_pending_tasks 查看完整任务详情
-2. 调用 task_update(status="IN_PROGRESS") 开始处理""",
+Suggested actions:
+1. Call get_pending_tasks to view full task details
+2. Call task_update(status="IN_PROGRESS") to start processing""",
                     meta={
                         "source": "agent-bridge",
                         "task_id": task["task_id"],

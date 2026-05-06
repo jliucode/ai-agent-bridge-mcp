@@ -7,21 +7,21 @@ from utils.logger import logger
 TASK_TOOLS = [
     Tool(
         name="task_delegate",
-        description="委派任务给其他项目的 Agent。",
+        description="Delegate task to Agent in other project.",
         inputSchema={
             "type": "object",
             "properties": {
                 "to_project": {
                     "type": "string",
-                    "description": "目标项目名称",
+                    "description": "Target project name",
                 },
                 "title": {
                     "type": "string",
-                    "description": "任务标题",
+                    "description": "Task title",
                 },
                 "description": {
                     "type": "string",
-                    "description": "任务详细描述",
+                    "description": "Task detailed description",
                 },
             },
             "required": ["to_project", "title", "description"],
@@ -29,22 +29,22 @@ TASK_TOOLS = [
     ),
     Tool(
         name="task_update",
-        description="更新任务状态（IN_PROGRESS, DONE, FAILED）。",
+        description="Update task status (IN_PROGRESS, DONE, FAILED).",
         inputSchema={
             "type": "object",
             "properties": {
                 "task_id": {
                     "type": "string",
-                    "description": "任务 ID",
+                    "description": "Task ID",
                 },
                 "status": {
                     "type": "string",
                     "enum": ["IN_PROGRESS", "DONE", "FAILED"],
-                    "description": "任务状态",
+                    "description": "Task status",
                 },
                 "result": {
                     "type": "string",
-                    "description": "任务结果或说明（可选）",
+                    "description": "Task result or note (optional)",
                 },
             },
             "required": ["task_id", "status"],
@@ -59,7 +59,7 @@ async def handle_task_delegate(mcp_server, arguments: dict) -> list:
     agent = mcp_server.agent_manager.get_agent_by_session(session_id)
 
     if not agent:
-        return [TextContent(type="text", text="错误: Agent 未注册")]
+        return [TextContent(type="text", text="Error: Agent not registered")]
 
     await mcp_server.bridge.send({
         "type": "task_delegate",
@@ -73,10 +73,10 @@ async def handle_task_delegate(mcp_server, arguments: dict) -> list:
     return [
         TextContent(
             type="text",
-            text=f"任务已委派!\n"
-                 f"目标项目: {arguments['to_project']}\n"
-                 f"任务: {arguments['title']}\n"
-                 f"等待结果通知...",
+            text=f"Task delegated!\n"
+                 f"Target project: {arguments['to_project']}\n"
+                 f"Task: {arguments['title']}\n"
+                 f"Waiting for result notification...",
         )
     ]
 
@@ -100,8 +100,8 @@ async def handle_task_update(mcp_server, arguments: dict) -> list:
     return [
         TextContent(
             type="text",
-            text=f"任务状态已更新!\n"
+            text=f"Task status updated!\n"
                  f"ID: {task_id}\n"
-                 f"状态: {status}",
+                 f"Status: {status}",
         )
     ]

@@ -5,26 +5,26 @@ from mcp.types import Tool, TextContent
 AGENT_TOOLS = [
     Tool(
         name="agent_register",
-        description="注册或更新 Agent 信息。首次调用生成 agent_id，后续调用可更新信息。",
+        description="Register or update Agent information. First call generates agent_id, subsequent calls can update info.",
         inputSchema={
             "type": "object",
             "properties": {
                 "project": {
                     "type": "string",
-                    "description": "项目名称",
+                    "description": "Project name",
                 },
                 "skills": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "技能列表（如 gitnexus, pptx, commit）",
+                    "description": "Skill list (e.g. gitnexus, pptx, commit)",
                 },
                 "description": {
                     "type": "string",
-                    "description": "Agent描述（可选）",
+                    "description": "Agent description (optional)",
                 },
                 "capabilities": {
                     "type": "object",
-                    "description": "详细能力（可选，如 MCP servers, tools）",
+                    "description": "Detailed capabilities (optional, e.g. MCP servers, tools)",
                 },
             },
             "required": ["project", "skills"],
@@ -32,7 +32,7 @@ AGENT_TOOLS = [
     ),
     Tool(
         name="get_pending_tasks",
-        description="查询当前 Agent 的待处理任务列表。",
+        description="Query pending tasks list for current Agent.",
         inputSchema={
             "type": "object",
             "properties": {},
@@ -40,7 +40,7 @@ AGENT_TOOLS = [
     ),
     Tool(
         name="list_remote_agents",
-        description="查询远程 Agent 列表（其他机器上的 Agent）。",
+        description="Query remote Agent list (Agents on other machines).",
         inputSchema={
             "type": "object",
             "properties": {},
@@ -64,10 +64,10 @@ async def handle_agent_register(mcp_server, arguments: dict) -> list:
     return [
         TextContent(
             type="text",
-            text=f"Agent 注册成功!\n"
+            text=f"Agent registered successfully!\n"
                  f"ID: {result['agent_id']}\n"
-                 f"状态: {result['status']}\n"
-                 f"待处理任务: {len(result['pending_tasks'])}个",
+                 f"Status: {result['status']}\n"
+                 f"Pending tasks: {len(result['pending_tasks'])}",
         )
     ]
 
@@ -79,13 +79,13 @@ async def handle_get_pending_tasks(mcp_server, arguments: dict) -> list:
     tasks = mcp_server.agent_manager.get_pending_tasks(session_id)
 
     if not tasks:
-        return [TextContent(type="text", text="无待处理任务")]
+        return [TextContent(type="text", text="No pending tasks")]
 
-    lines = ["待处理任务列表:"]
+    lines = ["Pending tasks list:"]
     for task in tasks:
         lines.append(f"- #{task['task_id']}: {task['title']}")
-        lines.append(f"  来自: {task['from_agent']}")
-        lines.append(f"  描述: {task['description']}")
+        lines.append(f"  From: {task['from_agent']}")
+        lines.append(f"  Description: {task['description']}")
 
     return [TextContent(type="text", text="\n".join(lines))]
 
@@ -95,12 +95,12 @@ async def handle_list_remote_agents(mcp_server, arguments: dict) -> list:
     agents = mcp_server.agent_manager.remote_agents
 
     if not agents:
-        return [TextContent(type="text", text="无远程 Agent")]
+        return [TextContent(type="text", text="No remote Agents")]
 
-    lines = ["远程 Agent 列表:"]
+    lines = ["Remote Agent list:"]
     for agent in agents:
         status_icon = "✅" if agent["status"] == "IDLE" else "🔄"
         lines.append(f"- {agent['project']} ({agent['agent_id']}) {status_icon}")
-        lines.append(f"  技能: {', '.join(agent['skills'])}")
+        lines.append(f"  Skills: {', '.join(agent['skills'])}")
 
     return [TextContent(type="text", text="\n".join(lines))]

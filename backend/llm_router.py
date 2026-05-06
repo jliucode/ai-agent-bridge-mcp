@@ -7,26 +7,26 @@ import httpx
 from config import DASHSCOPE_API_KEY, DASHSCOPE_MODEL_NAME
 
 
-BRIDGE_ROUTE_PROMPT = """你是一个任务路由决策助手。根据以下信息选择最合适的目标 Agent。
+BRIDGE_ROUTE_PROMPT = """You are a task routing decision assistant. Select the most suitable target Agent based on the following information.
 
-## 任务信息
-- 类型: {task_type}
-- 描述: {description}
-- 需要技能: {required_skills}
-- 目标项目: {target_project}
+## Task Information
+- Type: {task_type}
+- Description: {description}
+- Required Skills: {required_skills}
+- Target Project: {target_project}
 
-## 候选 Agent 列表
+## Candidate Agent List
 {candidates_json}
 
-## 选择标准
-1. 技能匹配：Agent 必须有所需技能
-2. 状态优先：IDLE > BUSY
-3. 项目相关性：项目名与任务相关的优先
-4. 负载均衡：同等条件选任务少的
+## Selection Criteria
+1. Skill Match: Agent must have required skills
+2. Status Priority: IDLE > BUSY
+3. Project Relevance: Project name matching task preferred
+4. Load Balancing: Select agent with fewer tasks when equal
 
-## 输出格式
-返回 JSON：
-{"selected_agent_id": "xxx", "reason": "选择理由", "confidence": 0.8}
+## Output Format
+Return JSON:
+{"selected_agent_id": "xxx", "reason": "selection reason", "confidence": 0.8}
 """
 
 
@@ -59,7 +59,7 @@ class LLMRouter:
             task_type=task_type,
             description=description,
             required_skills=", ".join(required_skills),
-            target_project=target_project or "未指定",
+            target_project=target_project or "Not specified",
             candidates_json=json.dumps(candidates, ensure_ascii=False, indent=2),
         )
 

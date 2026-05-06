@@ -7,37 +7,37 @@ import httpx
 from config import config
 
 
-LOCAL_ROUTE_PROMPT = """本机收到一个远程任务，需要分配给本机 Agent。
+LOCAL_ROUTE_PROMPT = """Local machine received a remote task, needs to assign to local Agent.
 
-## 任务信息
+## Task Information
 {task_json}
 
-## 本机 Agent 列表
+## Local Agent List
 {local_agents_json}
 
-## 选择标准
-1. 项目相关性：项目名匹配的优先
-2. 状态优先：IDLE > BUSY
-3. 技能匹配：有所需技能的优先
+## Selection Criteria
+1. Project Relevance: Project name matching preferred
+2. Status Priority: IDLE > BUSY
+3. Skill Match: Having required skills preferred
 
-输出 JSON：
-{"selected_agent_id": "xxx", "reason": "选择理由"}
+Output JSON:
+{"selected_agent_id": "xxx", "reason": "selection reason"}
 """
 
 
-RESULT_FORMAT_PROMPT = """将以下技术结果格式化为用户友好的摘要。
+RESULT_FORMAT_PROMPT = """Format the following technical result into a user-friendly summary.
 
-## 原始结果
+## Raw Result
 {raw_result}
 
-## 任务描述
+## Task Description
 {task_description}
 
-## 输出要求
-- 保留关键信息，省略冗余细节
-- 用自然语言描述
-- 突出重要发现或问题
-- 控制在 200 字以内
+## Output Requirements
+- Keep key information, omit redundant details
+- Use natural language description
+- Highlight important findings or issues
+- Keep within 200 words
 """
 
 

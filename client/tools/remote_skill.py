@@ -11,30 +11,30 @@ from utils.logger import logger
 
 REMOTE_SKILL_TOOL = Tool(
     name="remote_skill",
-    description="调用远程 Agent 的技能。自动选择合适的 Agent，支持文件传输。",
+    description="Call remote Agent's skill. Automatically selects suitable Agent, supports file transfer.",
     inputSchema={
         "type": "object",
         "properties": {
             "skill": {
                 "type": "string",
-                "description": "技能名称（如 gitnexus, pptx）",
+                "description": "Skill name (e.g. gitnexus, pptx)",
             },
             "action": {
                 "type": "string",
-                "description": "具体操作（如 query, create）",
+                "description": "Specific action (e.g. query, create)",
             },
             "params": {
                 "type": "object",
-                "description": "操作参数",
+                "description": "Action parameters",
             },
             "to_project": {
                 "type": "string",
-                "description": "目标项目（可选，用于筛选）",
+                "description": "Target project (optional, for filtering)",
             },
             "files": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "需传输的文件路径（可选）",
+                "description": "File paths to transfer (optional)",
             },
         },
         "required": ["skill", "action", "params"],
@@ -60,12 +60,12 @@ async def handle_remote_skill(mcp_server, arguments: dict) -> list:
     # Find candidates
     candidates = remote_cache.find_by_skill(skill, to_project)
     if not candidates:
-        return [TextContent(type="text", text=f"没有 Agent 提供 {skill} 技能")]
+        return [TextContent(type="text", text=f"No Agent provides {skill} skill")]
 
     # Filter out offline agents
     candidates = [a for a in candidates if a["status"] != "OFFLINE"]
     if not candidates:
-        return [TextContent(type="text", text=f"所有 {skill} Agent 都离线")]
+        return [TextContent(type="text", text=f"All {skill} Agents are offline")]
 
     # Select target
     local_agent_ids = list(mcp_server.agent_manager.agents.keys())
@@ -108,10 +108,10 @@ async def handle_remote_skill(mcp_server, arguments: dict) -> list:
     try:
         result = await asyncio.wait_for(future, timeout=120)
         logger.log_event("SKILL_CALL", skill, "Done", f"✅ {target['project']}", "✅")
-        return [TextContent(type="text", text=f"远程技能调用结果:\n{result}")]
+        return [TextContent(type="text", text=f"Remote skill call result:\n{result}")]
     except asyncio.TimeoutError:
-        logger.log_error(f"技能调用超时: {task_id}")
-        return [TextContent(type="text", text=f"调用超时 (120s)")]
+        logger.log_error(f"Skill call timeout: {task_id}")
+        return [TextContent(type="text", text=f"Call timeout (120s)")]
     finally:
         pending_results.pop(task_id, None)
 

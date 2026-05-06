@@ -21,17 +21,17 @@ class MCPProxyServer:
                     "experimental": {"claude/channel": {}},
                 },
                 "instructions": """
-Agent Bridge Proxy - 连接到远程 Bridge，管理本地 Agent。
+Agent Bridge Proxy - Connects to remote Bridge, manages local Agents.
 
-可用功能：
-- agent_register: 注册/更新 Agent 信息
-- task_delegate: 委派任务给其他项目
-- get_pending_tasks: 查询待处理任务
-- task_update: 更新任务状态
-- list_remote_agents: 查询远程 Agent列表
-- remote_skill: 调用远程 Agent 的技能（Phase 4）
+Available features:
+- agent_register: Register/update Agent information
+- task_delegate: Delegate task to other projects
+- get_pending_tasks: Query pending tasks
+- task_update: Update task status
+- list_remote_agents: Query remote Agent list
+- remote_skill: Call remote Agent's skill (Phase 4)
 
-当收到任务通知时，Channel 会推送消息到终端。
+When receiving task notification, Channel will push message to terminal.
 """,
             },
         )
